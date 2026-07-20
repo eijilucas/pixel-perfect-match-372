@@ -30,9 +30,8 @@ function LeadsPage() {
 
   const updateLeadStatus = useMutation({
     mutationFn: async ({ id, lead_status, status }: { id: string; lead_status: string; status?: string }) => {
-      const patch: Record<string, unknown> = { lead_status };
-      if (status) patch.status = status;
-      const { error } = await supabase.from("companies").update(patch).eq("id", id);
+      const patch = status ? { lead_status, status } : { lead_status };
+      const { error } = await supabase.from("companies").update(patch as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
