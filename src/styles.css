@@ -153,5 +153,28 @@
 
 /* Kanban card drag helper */
 .kanban-col {
-  min-height: 200px;
+  min-height: 0;
+}
+
+.kanban-board {
+  scrollbar-gutter: stable;
+}
+
+.kanban-board::-webkit-scrollbar {
+  height: 14px;
+}
+
+.kanban-board::-webkit-scrollbar-track {
+  background: var(--color-muted);
+  border-radius: 999px;
+}
+
+.kanban-board::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 3px solid var(--color-muted);
+  border-radius: 999px;
+}
+
+.kanban-board::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
 }

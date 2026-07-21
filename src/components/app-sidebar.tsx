@@ -21,10 +21,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import hinfrosLogo from "@/assets/hinfros-logo.png.asset.json";
-import hinfrosSymbol from "@/assets/hinfros-symbol.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+
+const hinfrosLogoWhite = "/hinfros-logo-white.svg";
+const hinfrosMarkWhite = "/hinfros-mark-white.svg";
 
 const items = [
   { title: "Painel", url: "/painel", icon: LayoutDashboard },
@@ -56,9 +57,9 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
           {collapsed ? (
-            <img src={hinfrosSymbol.url} alt="Hinfros" className="h-7 w-auto" />
+            <img src={hinfrosMarkWhite} alt="Hinfros" className="h-7 w-7 object-contain" />
           ) : (
-            <img src={hinfrosLogo.url} alt="Hinfros" className="h-8 w-auto brightness-0 invert" />
+            <img src={hinfrosLogoWhite} alt="Hinfros" className="h-8 w-36 object-contain object-left" />
           )}
         </div>
       </SidebarHeader>

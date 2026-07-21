@@ -1,11 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import type { ElementType, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PIPELINE_STAGE_LABELS } from "@/lib/crm-labels";
 import { brl, formatDate } from "@/lib/format";
-import { Sparkles, CheckCircle2, XCircle, Clock, Calendar, FileText, DollarSign, ListTodo, AlertTriangle } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  CircleDashed,
+  Clock,
+  DollarSign,
+  FileText,
+  ListTodo,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   component: PainelPage,
@@ -15,15 +27,18 @@ function PainelPage() {
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const [companies, activities, opps] = await Promise.all([
+      const [companies, activities, opps, services] = await Promise.all([
         supabase.from("companies").select("id, status, lead_status, created_at"),
         supabase.from("activities").select("id, status, due_date, title, type, company_id"),
         supabase.from("opportunities").select("id, stage, monthly_value, annual_value, name, company_id, updated_at"),
+        supabase.from("company_services").select("id, status, monthly_value, annual_value"),
       ]);
       return {
         companies: companies.data ?? [],
         activities: activities.data ?? [],
         opportunities: opps.data ?? [],
+        services: services.data ?? [],
+        hasServicesTable: !services.error,
       };
     },
   });
@@ -31,32 +46,48 @@ function PainelPage() {
   const c = stats?.companies ?? [];
   const a = stats?.activities ?? [];
   const o = stats?.opportunities ?? [];
+  const services = stats?.services ?? [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startPeriod = new Date();
   startPeriod.setDate(startPeriod.getDate() - 30);
 
-  const newLeads = c.filter(x => x.status === "lead" && new Date(x.created_at) >= startPeriod).length;
-  const qualified = c.filter(x => x.lead_status === "qualificado" || x.status === "qualificado").length;
-  const disqualified = c.filter(x => x.status === "desqualificado").length;
-  const futureOpps = c.filter(x => x.status === "oportunidade_futura").length;
-  const meetings = o.filter(x => x.stage === "reuniao_agendada").length;
-  const propDev = o.filter(x => x.stage === "proposta_em_desenvolvimento").length;
-  const propPres = o.filter(x => x.stage === "proposta_apresentada").length;
-  const propAcc = o.filter(x => x.stage === "contrato_aceito" || x.stage === "cliente_ativo").length;
+  const newLeads = c.filter((x) => x.status === "lead" && new Date(x.created_at) >= startPeriod).length;
+  const qualified = c.filter((x) => x.lead_status === "qualificado" || x.status === "qualificado").length;
+  const disqualified = c.filter((x) => x.status === "desqualificado").length;
+  const futureOpps = c.filter((x) => x.status === "oportunidade_futura").length;
+  const meetings = o.filter((x) => x.stage === "reuniao_agendada").length;
+  const propDev = o.filter((x) => x.stage === "proposta_em_desenvolvimento").length;
+  const propPres = o.filter((x) => x.stage === "proposta_apresentada").length;
+  const propAcc = o.filter((x) => x.stage === "contrato_aceito").length;
   const openARR = o
-    .filter(x => !["cliente_ativo", "perdido", "desqualificado"].includes(x.stage))
+    .filter((x) => !["cliente_ativo", "perdido", "desqualificado"].includes(x.stage))
     .reduce((sum, x) => sum + Number(x.annual_value || 0), 0);
-  const closedARR = o
-    .filter(x => x.stage === "cliente_ativo")
-    .reduce((sum, x) => sum + Number(x.annual_value || 0), 0);
-  const activeClients = c.filter(x => x.status === "cliente_ativo").length;
+  const closedARR = stats?.hasServicesTable
+    ? services.filter((x) => x.status === "ativo").reduce((sum, x) => sum + Number(x.annual_value || 0), 0)
+    : o.filter((x) => x.stage === "cliente_ativo").reduce((sum, x) => sum + Number(x.annual_value || 0), 0);
+  const activeClients = c.filter((x) => x.status === "cliente_ativo").length;
 
-  const todayTasks = a.filter(x => x.status === "pendente" && x.due_date && new Date(x.due_date).toDateString() === today.toDateString());
-  const lateTasks = a.filter(x => x.status === "pendente" && x.due_date && new Date(x.due_date) < today);
+  const pendingTasks = a.filter((x) => x.status === "pendente");
+  const doneTasks = a.filter((x) => x.status === "concluida");
+  const canceledTasks = a.filter((x) => x.status === "cancelada");
+  const scheduledTasks = pendingTasks.filter((x) => x.due_date);
+  const todayTasks = pendingTasks.filter(
+    (x) => x.due_date && new Date(x.due_date).toDateString() === today.toDateString(),
+  );
+  const lateTasks = pendingTasks.filter((x) => x.due_date && new Date(x.due_date) < today);
 
   const activeOpps = o
-    .filter(x => ["reuniao_agendada", "diagnostico_ti", "proposta_a_desenvolver", "proposta_em_desenvolvimento", "proposta_apresentada", "negociacao"].includes(x.stage))
+    .filter((x) =>
+      [
+        "reuniao_agendada",
+        "diagnostico_ti",
+        "proposta_a_desenvolver",
+        "proposta_em_desenvolvimento",
+        "proposta_apresentada",
+        "negociacao",
+      ].includes(x.stage),
+    )
     .slice(0, 8);
 
   return (
@@ -77,11 +108,33 @@ function PainelPage() {
         <Stat icon={CheckCircle2} label="Propostas aceitas" value={propAcc} />
         <Stat icon={DollarSign} label="ARR em aberto" value={brl(openARR)} />
         <Stat icon={DollarSign} label="ARR fechado" value={brl(closedARR)} />
-        <Stat icon={Building2Icon} label="Clientes ativos" value={activeClients} />
-        <Stat icon={ListTodo} label="Tarefas hoje" value={todayTasks.length} />
+        <Stat icon={Building2} label="Clientes ativos" value={activeClients} />
+        <Stat icon={ListTodo} label="Atividades pendentes" value={pendingTasks.length} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ListTodo className="h-4 w-4" />
+              Resumo de atividades
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <ActivityMetric icon={ListTodo} label="Total" value={a.length} />
+              <ActivityMetric icon={Clock} label="Pendentes" value={pendingTasks.length} />
+              <ActivityMetric icon={Calendar} label="Hoje" value={todayTasks.length} />
+              <ActivityMetric icon={AlertTriangle} label="Atrasadas" value={lateTasks.length} tone="destructive" />
+              <ActivityMetric icon={CheckCircle2} label="Concluídas" value={doneTasks.length} tone="success" />
+              <ActivityMetric icon={CircleDashed} label="Canceladas" value={canceledTasks.length} />
+            </div>
+            <Link to="/atividades" className="mt-3 block text-xs text-muted-foreground hover:text-foreground">
+              Ver atividades agendadas ({scheduledTasks.length})
+            </Link>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -93,7 +146,7 @@ function PainelPage() {
             {lateTasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma tarefa atrasada.</p>
             ) : (
-              lateTasks.slice(0, 6).map(t => (
+              lateTasks.slice(0, 6).map((t) => (
                 <Link key={t.id} to="/atividades" className="block text-sm border-l-2 border-destructive pl-3 py-1 hover:bg-muted/50 rounded-r">
                   <div className="font-medium truncate">{t.title}</div>
                   <div className="text-xs text-muted-foreground">Vencia em {formatDate(t.due_date)}</div>
@@ -103,7 +156,7 @@ function PainelPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Oportunidades em andamento</CardTitle>
           </CardHeader>
@@ -111,7 +164,7 @@ function PainelPage() {
             {activeOpps.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma oportunidade em andamento.</p>
             ) : (
-              activeOpps.map(x => (
+              activeOpps.map((x) => (
                 <Link key={x.id} to="/funil" className="block text-sm border-l-2 border-accent pl-3 py-1 hover:bg-muted/50 rounded-r">
                   <div className="font-medium truncate">{x.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -127,7 +180,30 @@ function PainelPage() {
   );
 }
 
-function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
+function ActivityMetric({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: ElementType;
+  label: string;
+  value: number;
+  tone?: "destructive" | "success";
+}) {
+  const color = tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "text-muted-foreground";
+  return (
+    <Link to="/atividades" className="rounded-md border p-3 hover:bg-muted/50 transition-colors">
+      <div className={`flex items-center gap-2 text-xs ${color}`}>
+        <Icon className="h-3.5 w-3.5" />
+        <span>{label}</span>
+      </div>
+      <div className="text-xl font-semibold tabular-nums mt-1">{value}</div>
+    </Link>
+  );
+}
+
+function Stat({ icon: Icon, label, value }: { icon: ElementType; label: string; value: ReactNode }) {
   return (
     <Card>
       <CardContent className="p-4">
@@ -140,6 +216,3 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
     </Card>
   );
 }
-
-// Local re-import to avoid conflict
-import { Building2 as Building2Icon } from "lucide-react";

@@ -2,7 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import hinfrosLogo from "@/assets/hinfros-logo.png.asset.json";
+
+const hinfrosLogo = "/hinfros-logo.png";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -22,7 +23,7 @@ function AuthenticatedLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b bg-card px-4">
             <SidebarTrigger />
-            <img src={hinfrosLogo.url} alt="Hinfros" className="h-7 w-auto md:hidden" />
+            <img src={hinfrosLogo} alt="Hinfros" className="h-7 w-28 object-contain object-left md:hidden" />
             <div className="ml-auto text-xs text-muted-foreground hidden sm:block">
               Hinfros CRM
             </div>

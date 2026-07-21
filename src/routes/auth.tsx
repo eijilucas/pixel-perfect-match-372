@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import hinfrosLogo from "@/assets/hinfros-logo.png.asset.json";
+
+const hinfrosLogoWhite = "/hinfros-logo-white.svg";
 
 const searchSchema = z.object({ redirect: z.string().optional() });
 
@@ -63,9 +64,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-primary p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <div className="bg-background rounded-lg p-4">
-            <img src={hinfrosLogo.url} alt="Hinfros" className="h-10 w-auto" />
-          </div>
+          <img src={hinfrosLogoWhite} alt="Hinfros" className="h-14 w-72 object-contain" />
         </div>
         <Card>
           <CardHeader className="text-center">
