@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
 const hinfrosLogoWhite = "/hinfros-logo-white.svg";
@@ -25,7 +24,6 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -43,23 +41,6 @@ function AuthPage() {
     navigate({ to: search.redirect ?? "/painel" });
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: fullName },
-      },
-    });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Cadastro criado. Você já pode entrar.");
-    navigate({ to: search.redirect ?? "/painel" });
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-primary p-4">
       <div className="w-full max-w-md">
@@ -69,52 +50,22 @@ function AuthPage() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Hinfros CRM</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Acesso da equipe comercial
-            </p>
+            <p className="text-sm text-muted-foreground">Acesso da equipe comercial</p>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="login">Entrar</TabsTrigger>
-                <TabsTrigger value="signup">Criar conta</TabsTrigger>
-              </TabsList>
-              <TabsContent value="login" className="space-y-4 pt-4">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="l-email">E-mail</Label>
-                    <Input id="l-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="l-pass">Senha</Label>
-                    <Input id="l-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Entrando..." : "Entrar"}
-                  </Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="signup" className="space-y-4 pt-4">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="s-name">Nome completo</Label>
-                    <Input id="s-name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="s-email">E-mail</Label>
-                    <Input id="s-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="s-pass">Senha</Label>
-                    <Input id="s-pass" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Mínimo 8 caracteres.</p>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Criando..." : "Criar conta"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="l-email">E-mail</Label>
+                <Input id="l-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="l-pass">Senha</Label>
+                <Input id="l-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
