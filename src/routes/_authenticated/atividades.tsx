@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { ACTIVITY_STATUS, ACTIVITY_TYPE } from "@/lib/crm-labels";
 import { formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { Pencil, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/atividades")({
   component: AtividadesPage,
@@ -97,6 +97,14 @@ function AtividadesPage() {
                 </div>
                 {a.notes && <div className="text-sm text-muted-foreground mt-1">{a.notes}</div>}
               </div>
+              <ActivityDialog
+                activity={a}
+                trigger={
+                  <Button type="button" variant="outline" size="icon" className="shrink-0" aria-label="Editar atividade">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                }
+              />
             </Card>
           );
         })}
@@ -105,13 +113,29 @@ function AtividadesPage() {
   );
 }
 
-function ActivityDialog() {
+type ActivityDialogProps = {
+  activity?: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    due_date: string | null;
+    company_id: string | null;
+    notes: string | null;
+    completed_at?: string | null;
+  };
+  trigger?: ReactNode;
+};
+
+function ActivityDialog({ activity, trigger }: ActivityDialogProps = {}) {
+  const isEditing = Boolean(activity);
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<string>("follow_up");
-  const [dueDate, setDueDate] = useState("");
-  const [companyId, setCompanyId] = useState<string>("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState(activity?.title ?? "");
+  const [type, setType] = useState<string>(activity?.type ?? "follow_up");
+  const [status, setStatus] = useState<string>(activity?.status ?? "pendente");
+  const [dueDate, setDueDate] = useState(toDateTimeLocal(activity?.due_date));
+  const [companyId, setCompanyId] = useState<string>(activity?.company_id ?? "");
+  const [notes, setNotes] = useState(activity?.notes ?? "");
   const queryClient = useQueryClient();
 
   const { data: companies = [] } = useQuery({
@@ -119,32 +143,78 @@ function ActivityDialog() {
     queryFn: async () => (await supabase.from("companies").select("id,name").order("name")).data ?? [],
   });
 
+  const resetForm = () => {
+    setTitle(activity?.title ?? "");
+    setType(activity?.type ?? "follow_up");
+    setStatus(activity?.status ?? "pendente");
+    setDueDate(toDateTimeLocal(activity?.due_date));
+    setCompanyId(activity?.company_id ?? "");
+    setNotes(activity?.notes ?? "");
+  };
+
   const mut = useMutation({
     mutationFn: async () => {
+      const payload = {
+        title,
+        type: type as never,
+        due_date: dueDate || null,
+        company_id: companyId || null,
+        notes: notes || null,
+      };
+
+      if (activity) {
+        const { error } = await supabase
+          .from("activities")
+          .update({
+            ...payload,
+            status: status as never,
+            completed_at: status === "concluida" ? (activity.completed_at ?? new Date().toISOString()) : null,
+          })
+          .eq("id", activity.id);
+        if (error) throw error;
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("activities").insert({
-        title, type: type as never, due_date: dueDate || null,
-        company_id: companyId || null, notes: notes || null,
-        created_by: user?.id, owner_id: user?.id,
+        ...payload,
+        created_by: user?.id,
+        owner_id: user?.id,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Atividade criada");
+      toast.success(isEditing ? "Atividade atualizada" : "Atividade criada");
       queryClient.invalidateQueries();
-      setOpen(false); setTitle(""); setType("follow_up"); setDueDate(""); setCompanyId(""); setNotes("");
+      setOpen(false);
+      if (!isEditing) {
+        setTitle("");
+        setType("follow_up");
+        setStatus("pendente");
+        setDueDate("");
+        setCompanyId("");
+        setNotes("");
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova atividade</Button></DialogTrigger>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) resetForm();
+        setOpen(nextOpen);
+      }}
+    >
+      <DialogTrigger asChild>
+        {trigger ?? <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova atividade</Button>}
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Nova atividade</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEditing ? "Editar atividade" : "Nova atividade"}</DialogTitle></DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-3">
           <div className="space-y-1.5"><Label className="text-xs">Título *</Label><Input required value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={isEditing ? "grid gap-3 sm:grid-cols-3" : "grid gap-3 sm:grid-cols-2"}>
             <div className="space-y-1.5"><Label className="text-xs">Tipo</Label>
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -153,6 +223,16 @@ function ActivityDialog() {
                 </SelectContent>
               </Select>
             </div>
+            {isEditing && (
+              <div className="space-y-1.5"><Label className="text-xs">Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ACTIVITY_STATUS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5"><Label className="text-xs">Vencimento</Label><Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
           </div>
           <div className="space-y-1.5"><Label className="text-xs">Empresa</Label>
@@ -170,4 +250,12 @@ function ActivityDialog() {
       </DialogContent>
     </Dialog>
   );
+}
+
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
 }
