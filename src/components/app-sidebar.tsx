@@ -24,7 +24,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { initials } from "@/lib/format";
 
 const hinfrosLogoWhite = "/hinfros-logo-white.svg";
 const hinfrosMarkWhite = "/hinfros-mark-white.svg";
@@ -45,6 +47,32 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery({
+    queryKey: ["current-user-profile"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name,email")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const fullName =
+        typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name
+          ? user.user_metadata.full_name
+          : profile?.full_name || user.email || "Usuário";
+
+      return {
+        email: user.email ?? profile?.email ?? "",
+        fullName,
+        avatarUrl: typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : "",
+      };
+    },
+    staleTime: 60_000,
+  });
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
@@ -90,8 +118,19 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={isActive("/minha-conta")} tooltip="Minha conta">
               <Link to="/minha-conta" className="flex items-center gap-2">
-                <UserCircle className="h-4 w-4" />
-                <span>Minha conta</span>
+                {currentUser ? (
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
+                    <AvatarFallback className="bg-sidebar-accent text-[10px] text-sidebar-accent-foreground">
+                      {initials(currentUser.fullName)}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <UserCircle className="h-4 w-4" />
+                )}
+                <span className="min-w-0 truncate">
+                  {currentUser?.fullName ?? "Minha conta"}
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

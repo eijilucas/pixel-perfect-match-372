@@ -121,6 +121,12 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{document.documentElement.classList.toggle('dark',localStorage.getItem('hinfros-theme')==='dark')}catch(e){}",
+          }}
+        />
         <HeadContent />
       </head>
       <body>

@@ -2,6 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { applyTheme, getStoredTheme, storeTheme, type AppTheme } from "@/lib/theme";
+import { useEffect } from "react";
 
 const hinfrosLogo = "/hinfros-logo.png";
 
@@ -16,6 +18,16 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
+  useEffect(() => {
+    applyTheme(getStoredTheme());
+    supabase.auth.getUser().then(({ data }) => {
+      const theme = data.user?.user_metadata?.theme;
+      if ((theme === "dark" || theme === "light") && !localStorage.getItem("hinfros-theme")) {
+        storeTheme(theme as AppTheme);
+      }
+    });
+  }, []);
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
