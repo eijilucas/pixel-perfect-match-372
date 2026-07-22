@@ -86,7 +86,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-2">
+        <div className={`flex items-center gap-2 py-2 ${collapsed ? "justify-center px-0" : "px-2"}`}>
           {collapsed ? (
             <img src={hinfrosMarkWhite} alt="Hinfros" className="h-7 w-7 object-contain" />
           ) : (
@@ -115,11 +115,16 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/minha-conta")} tooltip="Minha conta">
-              <Link to="/minha-conta" className="flex items-center gap-2">
+          <SidebarMenuItem className={collapsed ? "flex justify-center" : undefined}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive("/minha-conta")}
+              tooltip="Minha conta"
+              className={collapsed ? "!p-0 justify-center" : undefined}
+            >
+              <Link to="/minha-conta" className={`flex items-center ${collapsed ? "justify-center gap-0" : "gap-2"}`}>
                 {currentUser ? (
-                  <Avatar className="h-7 w-7">
+                  <Avatar className="h-7 w-7 shrink-0">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-sidebar-accent text-[10px] text-sidebar-accent-foreground">
                       {initials(currentUser.fullName)}
@@ -128,16 +133,20 @@ export function AppSidebar() {
                 ) : (
                   <UserCircle className="h-4 w-4" />
                 )}
-                <span className="min-w-0 truncate">
+                <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>
                   {currentUser?.fullName ?? "Minha conta"}
                 </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleSignOut} tooltip="Sair">
+          <SidebarMenuItem className={collapsed ? "flex justify-center" : undefined}>
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              tooltip="Sair"
+              className={collapsed ? "justify-center" : undefined}
+            >
               <LogOut className="h-4 w-4" />
-              <span>Sair</span>
+              <span className={collapsed ? "sr-only" : undefined}>Sair</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
