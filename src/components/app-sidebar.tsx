@@ -7,6 +7,7 @@ import {
   UserCog,
   Kanban,
   CheckSquare,
+  UserCircle,
   LogOut,
 } from "lucide-react";
 import {
@@ -86,6 +87,14 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive("/minha-conta")} tooltip="Minha conta">
+              <Link to="/minha-conta" className="flex items-center gap-2">
+                <UserCircle className="h-4 w-4" />
+                <span>Minha conta</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleSignOut} tooltip="Sair">
               <LogOut className="h-4 w-4" />
