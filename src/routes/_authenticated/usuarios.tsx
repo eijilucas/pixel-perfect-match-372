@@ -9,9 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/format";
-import { Copy, Plus, RefreshCw } from "lucide-react";
+import { Copy, KeyRound, Plus, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -85,14 +85,42 @@ const createUserFn = createServerFn({ method: "POST" })
     };
   });
 
+const updateUserPasswordSchema = z.object({
+  userId: z.string().uuid("Usuário inválido"),
+  password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres").max(128, "Senha muito longa"),
+});
+
+const updateUserPasswordFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => updateUserPasswordSchema.parse(data))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: updated, error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.password,
+    });
+
+    if (error) throw new Error(error.message);
+
+    return {
+      id: updated.user?.id ?? data.userId,
+      email: updated.user?.email ?? "",
+    };
+  });
+
 function UsuariosPage() {
   const listUsers = useServerFn(listUsersFn);
   const createUser = useServerFn(createUserFn);
+  const updateUserPassword = useServerFn(updateUserPasswordFn);
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; email: string; name: string } | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(() => generateTemporaryPassword());
+  const [newUserPassword, setNewUserPassword] = useState(() => generateTemporaryPassword());
 
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
@@ -111,6 +139,12 @@ function UsuariosPage() {
     setPassword(generateTemporaryPassword());
   };
 
+  const openPasswordDialog = (user: { id: string; email: string; name: string }) => {
+    setSelectedUser(user);
+    setNewUserPassword(generateTemporaryPassword());
+    setPasswordOpen(true);
+  };
+
   const mutation = useMutation({
     mutationFn: () => createUser({ data: { fullName, email, password } }),
     onSuccess: ({ email: createdEmail }) => {
@@ -118,6 +152,21 @@ function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setOpen(false);
       resetForm();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedUser) throw new Error("Selecione um usuário.");
+      return updateUserPassword({ data: { userId: selectedUser.id, password: newUserPassword } });
+    },
+    onSuccess: ({ email: updatedEmail }) => {
+      toast.success(`Senha alterada: ${updatedEmail || selectedUser?.email || "usuário"}`);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      setPasswordOpen(false);
+      setSelectedUser(null);
+      setNewUserPassword(generateTemporaryPassword());
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -192,6 +241,61 @@ function UsuariosPage() {
         </Dialog>
       </div>
 
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para {selectedUser?.name || selectedUser?.email || "este usuário"}.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              passwordMutation.mutate();
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nova senha *</Label>
+              <div className="flex gap-2">
+                <Input
+                  required
+                  minLength={8}
+                  value={newUserPassword}
+                  onChange={(event) => setNewUserPassword(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Gerar senha"
+                  onClick={() => setNewUserPassword(generateTemporaryPassword())}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Copiar senha"
+                  onClick={() => copyPassword(newUserPassword)}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Copie e envie a nova senha ao usuário por um canal seguro.</p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPasswordOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={passwordMutation.isPending}>
+                {passwordMutation.isPending ? "Alterando..." : "Alterar senha"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {usersQuery.isError ? (
         <Card className="p-4">
           <p className="font-medium">Não foi possível carregar os usuários.</p>
@@ -206,13 +310,14 @@ function UsuariosPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead>Último acesso</TableHead>
+                <TableHead className="w-32 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {usersQuery.isLoading ? (
-                <TableRow><TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">Carregando...</TableCell></TableRow>
               ) : orderedUsers.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">Nenhum usuário.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">Nenhum usuário.</TableCell></TableRow>
               ) : orderedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
@@ -226,6 +331,17 @@ function UsuariosPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDateTime(user.createdAt)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDateTime(user.lastSignInAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordDialog(user)}
+                    >
+                      <KeyRound className="h-4 w-4 mr-1" />
+                      Senha
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
