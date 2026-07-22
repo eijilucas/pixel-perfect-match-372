@@ -4,6 +4,7 @@ import {
   Sparkles,
   Building2,
   Users,
+  UserCog,
   Kanban,
   CheckSquare,
   LogOut,
@@ -34,6 +35,7 @@ const items = [
   { title: "Contatos", url: "/contatos", icon: Users },
   { title: "Funil", url: "/funil", icon: Kanban },
   { title: "Atividades", url: "/atividades", icon: CheckSquare },
+  { title: "Usuários", url: "/usuarios", icon: UserCog },
 ];
 
 export function AppSidebar() {
