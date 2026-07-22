@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CONTACT_ROLE } from "@/lib/crm-labels";
 import { waLink } from "@/lib/format";
 import { useState, type ReactNode } from "react";
-import { MessageCircle, Search, Mail, Phone, Pencil } from "lucide-react";
+import { MessageCircle, Search, Mail, Phone, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/contatos")({
@@ -33,9 +33,19 @@ function ContatosPage() {
 
   return (
     <div className="p-6 space-y-4 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-semibold">Contatos</h1>
-        <p className="text-sm text-muted-foreground">Pessoas vinculadas às empresas</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Contatos</h1>
+          <p className="text-sm text-muted-foreground">Pessoas vinculadas às empresas</p>
+        </div>
+        <ContactDialog
+          trigger={
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Novo contato
+            </Button>
+          }
+        />
       </div>
 
       <div className="relative max-w-md">
@@ -86,7 +96,7 @@ function ContatosPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <ContactEditDialog
+                    <ContactDialog
                       contact={c}
                       trigger={
                         <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Editar contato ${c.name}`}>
@@ -116,45 +126,60 @@ type ContactRow = {
   decision_role: string | null;
 };
 
-function ContactEditDialog({ contact, trigger }: { contact: ContactRow; trigger: ReactNode }) {
+function ContactDialog({ contact, trigger }: { contact?: ContactRow; trigger: ReactNode }) {
+  const isEditing = Boolean(contact);
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(contact.name);
-  const [roleTitle, setRoleTitle] = useState(contact.role_title ?? "");
-  const [role, setRole] = useState(contact.decision_role ?? "");
-  const [email, setEmail] = useState(contact.email ?? "");
-  const [phone, setPhone] = useState(contact.phone ?? "");
-  const [whatsapp, setWhatsapp] = useState(contact.whatsapp ?? "");
+  const [name, setName] = useState(contact?.name ?? "");
+  const [companyId, setCompanyId] = useState(contact?.company_id ?? "");
+  const [roleTitle, setRoleTitle] = useState(contact?.role_title ?? "");
+  const [role, setRole] = useState(contact?.decision_role ?? "");
+  const [email, setEmail] = useState(contact?.email ?? "");
+  const [phone, setPhone] = useState(contact?.phone ?? "");
+  const [whatsapp, setWhatsapp] = useState(contact?.whatsapp ?? "");
   const queryClient = useQueryClient();
 
+  const { data: companies = [] } = useQuery({
+    queryKey: ["companies-min"],
+    queryFn: async () => (await supabase.from("companies").select("id,name").order("name")).data ?? [],
+  });
+
   const resetForm = () => {
-    setName(contact.name);
-    setRoleTitle(contact.role_title ?? "");
-    setRole(contact.decision_role ?? "");
-    setEmail(contact.email ?? "");
-    setPhone(contact.phone ?? "");
-    setWhatsapp(contact.whatsapp ?? "");
+    setName(contact?.name ?? "");
+    setCompanyId(contact?.company_id ?? "");
+    setRoleTitle(contact?.role_title ?? "");
+    setRole(contact?.decision_role ?? "");
+    setEmail(contact?.email ?? "");
+    setPhone(contact?.phone ?? "");
+    setWhatsapp(contact?.whatsapp ?? "");
   };
 
   const mut = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("contacts")
-        .update({
-          name,
-          role_title: roleTitle || null,
-          decision_role: (role || null) as never,
-          email: email || null,
-          phone: phone || null,
-          whatsapp: whatsapp || null,
-        })
-        .eq("id", contact.id);
+      if (!companyId) throw new Error("Selecione uma empresa.");
+
+      const payload = {
+        company_id: companyId,
+        name,
+        role_title: roleTitle || null,
+        decision_role: (role || null) as never,
+        email: email || null,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+      };
+
+      const { error } = contact
+        ? await supabase.from("contacts").update(payload).eq("id", contact.id)
+        : await supabase.from("contacts").insert(payload);
+
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Contato atualizado");
+      toast.success(isEditing ? "Contato atualizado" : "Contato criado");
       queryClient.invalidateQueries({ queryKey: ["contacts-all"] });
-      queryClient.invalidateQueries({ queryKey: ["contacts", contact.company_id] });
+      if (contact?.company_id) queryClient.invalidateQueries({ queryKey: ["contacts", contact.company_id] });
+      if (companyId) queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
       setOpen(false);
+      if (!isEditing) resetForm();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -169,11 +194,20 @@ function ContactEditDialog({ contact, trigger }: { contact: ContactRow; trigger:
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Editar contato</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEditing ? "Editar contato" : "Novo contato"}</DialogTitle></DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Nome *</Label>
             <Input required value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Empresa *</Label>
+            <Select value={companyId} onValueChange={setCompanyId} required>
+              <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
+              <SelectContent>
+                {companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Cargo</Label>
