@@ -157,7 +157,7 @@ function ActivityDialog({ activity, trigger }: ActivityDialogProps = {}) {
       const payload = {
         title,
         type: type as never,
-        due_date: dueDate || null,
+        due_date: fromDateTimeLocal(dueDate),
         company_id: companyId || null,
         notes: notes || null,
       };
@@ -258,4 +258,11 @@ function toDateTimeLocal(value?: string | null) {
   if (Number.isNaN(date.getTime())) return "";
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return localDate.toISOString().slice(0, 16);
+}
+
+function fromDateTimeLocal(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }
